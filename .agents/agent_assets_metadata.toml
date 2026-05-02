@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "wc2ge5dWTQ5Gg5pYhisco"
+uri = "file://README.md"
+type = "text"
+title = "DEADZONE — README"
