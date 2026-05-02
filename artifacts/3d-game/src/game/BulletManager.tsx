@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { sharedState } from './gameState';
-import { BULLET_SPEED, BULLET_LIFETIME, BULLET_RADIUS, BULLET_DAMAGE, RESPAWN_TIME, MAP_HALF } from './constants';
+import { BULLET_SPEED, BULLET_LIFETIME, BULLET_RADIUS, BULLET_DAMAGE, BOT_BULLET_DAMAGE, RESPAWN_TIME, MAP_HALF } from './constants';
 
 const MAX_VISIBLE = 60;
 const _tempVec = new THREE.Vector3();
@@ -83,7 +83,7 @@ export default function BulletManager() {
         _tempVec.copy(sharedState.playerPos).sub(bullet.position);
         if (_tempVec.length() < BULLET_RADIUS) {
           bullet.alive = false;
-          sharedState.playerHealth -= BULLET_DAMAGE;
+          sharedState.playerHealth -= BOT_BULLET_DAMAGE;
           sharedState.lastHitFlash = Date.now();
           if (sharedState.playerHealth <= 0) {
             sharedState.playerHealth = 0;

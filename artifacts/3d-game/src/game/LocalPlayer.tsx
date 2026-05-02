@@ -56,7 +56,7 @@ export default function LocalPlayer() {
 
     const onMouseDown = (e: MouseEvent) => {
       if (!sharedState.isPointerLocked) {
-        requestPointerLock();
+        try { requestPointerLock(); } catch { /* browser may throttle rapid re-lock */ }
         return;
       }
       if (!sharedState.matchRunning || !sharedState.playerAlive) return;

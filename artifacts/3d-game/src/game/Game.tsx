@@ -1,15 +1,15 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls } from '@react-three/drei';
-import * as THREE from 'three';
 import World from './World';
 import LocalPlayer from './LocalPlayer';
 import BotEntity from './BotEntity';
 import BulletManager from './BulletManager';
 import HUD from './HUD';
 import EndScreen from './EndScreen';
-import { sharedState, initQuickPlay } from './gameState';
+import { sharedState } from './gameState';
 import { useGameStore } from '../store/useGameStore';
+import { BotData } from './types';
 
 const keyMap = [
   { name: 'forward', keys: ['ArrowUp', 'KeyW'] },
@@ -21,12 +21,17 @@ const keyMap = [
 export default function Game() {
   const mode = useGameStore((s) => s.mode);
   const resetGame = useGameStore((s) => s.resetGame);
-  const setMode = useGameStore((s) => s.setMode);
+
+  // Snapshot the bot list once on mount so BotEntity and BulletManager
+  // always reference the SAME bot objects — never re-initialize here.
+  const [bots] = useState<BotData[]>(() => sharedState.bots);
 
   useEffect(() => {
-    initQuickPlay();
+    // initQuickPlay() was already called by Landing/Lobby before setMode('playing').
+    // Just ensure match is flagged as running and UI state is clean.
+    sharedState.matchRunning = true;
     resetGame();
-    console.log('Game initialized: Quick Play with bots');
+
     return () => {
       sharedState.matchRunning = false;
       if (document.pointerLockElement) {
@@ -47,10 +52,8 @@ export default function Game() {
           }}
           style={{ width: '100%', height: '100%' }}
         >
-          {/* Fog */}
           <fog attach="fog" args={['#050a14', 30, 80]} />
 
-          {/* Ambient + directional light */}
           <ambientLight intensity={0.35} color="#1a2a4a" />
           <directionalLight
             position={[10, 20, 10]}
@@ -65,16 +68,13 @@ export default function Game() {
             <World />
             <LocalPlayer />
             <BulletManager />
-
-            {/* Render bots */}
-            {sharedState.bots.map((bot) => (
+            {bots.map((bot) => (
               <BotEntity key={bot.id} bot={bot} />
             ))}
           </Suspense>
         </Canvas>
       </KeyboardControls>
 
-      {/* HTML overlay */}
       <HUD />
       {mode === 'ended' && <EndScreen />}
     </div>
