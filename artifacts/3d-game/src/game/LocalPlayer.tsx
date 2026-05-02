@@ -14,6 +14,14 @@ import {
   RESPAWN_TIME,
 } from './constants';
 import { BulletData, SPAWN_POINTS } from './types';
+import {
+  playShoot,
+  playEmpty,
+  playReload,
+  playMatchEnd,
+  playRespawn,
+  tickLowHealthBeep,
+} from './soundManager';
 
 enum Controls {
   forward = 'forward',
@@ -34,8 +42,15 @@ export default function LocalPlayer() {
   const playerNameRef = useRef(playerName);
   playerNameRef.current = playerName;
 
+  // Pointer lock cooldown — browser blocks re-lock within ~1s of exit
+  const lastUnlockTime = useRef(0);
+  const wasAliveRef = useRef(true);
+
   const requestPointerLock = useCallback(() => {
-    gl.domElement.requestPointerLock();
+    if (Date.now() - lastUnlockTime.current < 1000) return;
+    try {
+      gl.domElement.requestPointerLock();
+    } catch { /* browser may throttle */ }
   }, [gl]);
 
   useEffect(() => {
@@ -50,13 +65,14 @@ export default function LocalPlayer() {
 
     const onPointerLockChange = () => {
       const locked = document.pointerLockElement === canvas;
+      if (!locked) lastUnlockTime.current = Date.now();
       sharedState.isPointerLocked = locked;
       setPointerLocked(locked);
     };
 
     const onMouseDown = (e: MouseEvent) => {
       if (!sharedState.isPointerLocked) {
-        try { requestPointerLock(); } catch { /* browser may throttle rapid re-lock */ }
+        requestPointerLock();
         return;
       }
       if (!sharedState.matchRunning || !sharedState.playerAlive) return;
@@ -72,6 +88,7 @@ export default function LocalPlayer() {
       ) {
         sharedState.playerIsReloading = true;
         sharedState.playerReloadTimer = RELOAD_TIME;
+        playReload();
       }
     };
 
@@ -94,11 +111,14 @@ export default function LocalPlayer() {
     if (!sharedState.playerAlive) return;
     if (sharedState.playerIsReloading) return;
     if (sharedState.playerAmmo <= 0) {
+      playEmpty();
       sharedState.playerIsReloading = true;
       sharedState.playerReloadTimer = RELOAD_TIME;
+      playReload();
       return;
     }
     sharedState.playerAmmo--;
+    playShoot();
 
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
@@ -130,6 +150,9 @@ export default function LocalPlayer() {
 
     // Respawn
     if (!sharedState.playerAlive) {
+      // Sound on transition dead → respawn
+      if (wasAliveRef.current) wasAliveRef.current = false;
+
       sharedState.playerRespawnTimer -= delta;
       if (sharedState.playerRespawnTimer <= 0) {
         const sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
@@ -138,12 +161,19 @@ export default function LocalPlayer() {
         sharedState.playerHealth = PLAYER_HEALTH;
         sharedState.playerAmmo = MAX_AMMO;
         sharedState.playerIsReloading = false;
+        wasAliveRef.current = true;
+        playRespawn();
       }
       camera.position.copy(sharedState.playerPos);
       camera.rotation.order = 'YXZ';
       camera.rotation.y = sharedState.playerYaw;
       camera.rotation.x = sharedState.playerPitch;
       return;
+    }
+
+    // Low health warning beep
+    if (sharedState.playerHealth <= 30) {
+      tickLowHealthBeep(Date.now());
     }
 
     // Movement
@@ -181,6 +211,7 @@ export default function LocalPlayer() {
       if (sharedState.matchTimer <= 0) {
         sharedState.matchTimer = 0;
         sharedState.matchRunning = false;
+        playMatchEnd();
 
         let maxKills = sharedState.playerKills;
         let winnerName = playerNameRef.current;

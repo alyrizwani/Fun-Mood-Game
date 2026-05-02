@@ -10,6 +10,7 @@ import EndScreen from './EndScreen';
 import { sharedState } from './gameState';
 import { useGameStore } from '../store/useGameStore';
 import { BotData } from './types';
+import { playMatchStart } from './soundManager';
 
 const keyMap = [
   { name: 'forward', keys: ['ArrowUp', 'KeyW'] },
@@ -22,21 +23,18 @@ export default function Game() {
   const mode = useGameStore((s) => s.mode);
   const resetGame = useGameStore((s) => s.resetGame);
 
-  // Snapshot the bot list once on mount so BotEntity and BulletManager
-  // always reference the SAME bot objects — never re-initialize here.
+  // Snapshot the bot list once on mount — BotEntity + BulletManager must
+  // share the exact same object references. Never call initQuickPlay here.
   const [bots] = useState<BotData[]>(() => sharedState.bots);
 
   useEffect(() => {
-    // initQuickPlay() was already called by Landing/Lobby before setMode('playing').
-    // Just ensure match is flagged as running and UI state is clean.
     sharedState.matchRunning = true;
     resetGame();
+    playMatchStart();
 
     return () => {
       sharedState.matchRunning = false;
-      if (document.pointerLockElement) {
-        document.exitPointerLock();
-      }
+      if (document.pointerLockElement) document.exitPointerLock();
     };
   }, [resetGame]);
 
@@ -46,23 +44,25 @@ export default function Game() {
         <Canvas
           shadows
           camera={{ fov: 80, near: 0.05, far: 300 }}
-          gl={{
-            antialias: true,
-            powerPreference: 'high-performance',
-          }}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
           style={{ width: '100%', height: '100%' }}
         >
-          <fog attach="fog" args={['#050a14', 30, 80]} />
-
-          <ambientLight intensity={0.35} color="#1a2a4a" />
+          <fog attach="fog" args={['#050a14', 28, 75]} />
+          <ambientLight intensity={0.25} color="#1a2a4a" />
           <directionalLight
-            position={[10, 20, 10]}
-            intensity={1.2}
-            color="#c8d8ff"
+            position={[8, 18, 8]}
+            intensity={1.0}
+            color="#c0d0ff"
             castShadow
             shadow-mapSize={[1024, 1024]}
+            shadow-camera-near={0.5}
+            shadow-camera-far={80}
+            shadow-camera-left={-30}
+            shadow-camera-right={30}
+            shadow-camera-top={30}
+            shadow-camera-bottom={-30}
           />
-          <directionalLight position={[-10, 10, -10]} intensity={0.4} color="#ff4444" />
+          <directionalLight position={[-8, 8, -8]} intensity={0.3} color="#ff3322" />
 
           <Suspense fallback={null}>
             <World />

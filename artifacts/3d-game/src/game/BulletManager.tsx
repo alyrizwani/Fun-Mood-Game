@@ -3,16 +3,17 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { sharedState } from './gameState';
 import { BULLET_SPEED, BULLET_LIFETIME, BULLET_RADIUS, BULLET_DAMAGE, BOT_BULLET_DAMAGE, RESPAWN_TIME, MAP_HALF } from './constants';
+import { playHitEnemy, playKill, playBotDeath, playPlayerHit, playPlayerDeath } from './soundManager';
 
 const MAX_VISIBLE = 60;
 const _tempVec = new THREE.Vector3();
 
-const playerBulletMat = new THREE.MeshBasicMaterial({ color: '#00ffaa' });
-const botBulletMat = new THREE.MeshBasicMaterial({ color: '#ff4444' });
-const playerTrailMat = new THREE.MeshBasicMaterial({ color: '#00ffaa', opacity: 0.25, transparent: true });
-const botTrailMat = new THREE.MeshBasicMaterial({ color: '#ff4444', opacity: 0.25, transparent: true });
-const bulletGeo = new THREE.SphereGeometry(0.08, 5, 4);
-const trailGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 4);
+const playerBulletMat = new THREE.MeshBasicMaterial({ color: '#00ffcc' });
+const botBulletMat = new THREE.MeshBasicMaterial({ color: '#ff3333' });
+const playerTrailMat = new THREE.MeshBasicMaterial({ color: '#00ffcc', opacity: 0.2, transparent: true });
+const botTrailMat = new THREE.MeshBasicMaterial({ color: '#ff3333', opacity: 0.2, transparent: true });
+const bulletGeo = new THREE.SphereGeometry(0.09, 5, 4);
+const trailGeo = new THREE.CylinderGeometry(0.025, 0.01, 0.4, 4);
 
 export default function BulletManager() {
   const groupRef = useRef<THREE.Group>(null!);
@@ -22,7 +23,7 @@ export default function BulletManager() {
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Initialize pool once
+    // Initialize object pool once
     if (!initialized.current) {
       initialized.current = true;
       for (let i = 0; i < MAX_VISIBLE; i++) {
@@ -48,7 +49,7 @@ export default function BulletManager() {
     const now = Date.now();
     const bots = sharedState.bots;
 
-    // Expire bullets
+    // Expire dead/old bullets
     sharedState.bullets = sharedState.bullets.filter(
       (b) => b.alive && now - b.spawnTime < BULLET_LIFETIME,
     );
@@ -75,6 +76,10 @@ export default function BulletManager() {
               bot.isAlive = false;
               bot.respawnTimer = RESPAWN_TIME;
               sharedState.playerKills++;
+              playKill();
+              playBotDeath();
+            } else {
+              playHitEnemy();
             }
             break;
           }
@@ -92,12 +97,15 @@ export default function BulletManager() {
             sharedState.playerRespawnTimer = RESPAWN_TIME;
             const shooter = bots.find((b) => b.id === bullet.ownerId);
             if (shooter) shooter.kills++;
+            playPlayerDeath();
+          } else {
+            playPlayerHit();
           }
         }
       }
     }
 
-    // Render active bullets
+    // Render pooled bullet meshes
     const active = sharedState.bullets.filter((b) => b.alive);
     for (let i = 0; i < bulletMeshes.current.length; i++) {
       const slot = bulletMeshes.current[i];
@@ -109,8 +117,7 @@ export default function BulletManager() {
         slot.mesh.visible = true;
 
         slot.trail.material = isPlayer ? playerTrailMat : botTrailMat;
-        slot.trail.position.copy(bullet.position);
-        slot.trail.position.addScaledVector(bullet.direction, -0.2);
+        slot.trail.position.copy(bullet.position).addScaledVector(bullet.direction, -0.22);
         slot.trail.quaternion.setFromUnitVectors(
           new THREE.Vector3(0, 1, 0),
           bullet.direction.clone().normalize(),
